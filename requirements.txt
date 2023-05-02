@@ -1,0 +1,4 @@
+pyarrow
+google-cloud-storage
+pandas
+pytest
