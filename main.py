@@ -15,7 +15,7 @@ def main():
     #df = table.to_pandas()
     #print(df.groupby(["publication_date"]).count())
     #print(df[df.publication_date == "2023-05-03T19:34:18.013611Z"])
-    #storage_client = storage.Client(project="prediswiss")
+    storage_client = storage.Client(project="prediswiss")
 
     try:
         bucketParquet = storage_client.get_bucket(bucket_name)
@@ -33,7 +33,7 @@ def main():
     dataframe = pd.DataFrame()
 
     for dt in rrule.rrule(rrule.MINUTELY, dtstart=hourEarlier, until=now):
-        blob = bucketRaw.get_blob(dt.strftime("%Y-%m-%d/19-%M"))
+        blob = bucketRaw.get_blob(dt.strftime("%Y-%m-%d/H-%M"))
         data = blob.download_as_text()
 
         namespaces = {
