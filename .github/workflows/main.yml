@@ -39,7 +39,7 @@ jobs:
           pytest tests.py
           
       - name: Create scheduler
-        run: gcloud scheduler jobs create pubsub PrediSwissScheduleMinute --location="us-east1" --schedule= "0 */1 * * *" --topic="projects/${{secrets.PROJECT_ID}}/topics/${{secrets.TOPIC_ID}}" --message-body "raw to parquet"
+        run: gcloud scheduler jobs create pubsub PrediSwissScheduleMinute --location="us-east1" --schedule="0 */1 * * *" --topic="projects/${{secrets.PROJECT_ID}}/topics/${{secrets.TOPIC_ID}}" --message-body "raw to parquet"
 
       - name: Deploy the function
         uses: 'google-github-actions/deploy-cloud-functions@v1'
