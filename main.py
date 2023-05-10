@@ -33,8 +33,8 @@ def to_parquet(cloud_event):
     except:
         raise RawDataException
     
-    now = datetime.now() - timedelta(minutes=1)
-    hourEarlier = now - timedelta(hours=1) - timedelta(minutes=1)
+    now = datetime.now() - timedelta(minutes=3)
+    hourEarlier = now - timedelta(hours=1) - timedelta(minutes=3)
     
     dataframe = pd.DataFrame()
 
