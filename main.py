@@ -6,15 +6,21 @@ from datetime import datetime, timedelta
 from dateutil import rrule
 import xml.etree.ElementTree as ET
 from google.cloud import storage
+import functions_framework
+import gcsfs
 
 bucket_name = "prediswiss-parquet-data"
 bucket_row = "prediswiss-raw-data"
 
-def main():
-    #table = pq.read_table('test.parquet')
+@functions_framework.cloud_event
+def to_parquet(cloud_event):
+    #datasetPath = "2023-05"
+    #fs_gcs = gcsfs.GCSFileSystem()
+    #path = bucket_name + "/" + datasetPath + ".parquet"
+    #table = pq.read_table(path, filesystem=fs_gcs)
     #df = table.to_pandas()
     #print(df.groupby(["publication_date"]).count())
-    #print(df[df.publication_date == "2023-05-03T19:34:18.013611Z"])
+
     storage_client = storage.Client(project="prediswiss")
 
     try:
@@ -33,7 +39,7 @@ def main():
     dataframe = pd.DataFrame()
 
     for dt in rrule.rrule(rrule.MINUTELY, dtstart=hourEarlier, until=now):
-        blob = bucketRaw.get_blob(dt.strftime("%Y-%m-%d/H-%M"))
+        blob = bucketRaw.get_blob(dt.strftime("%Y-%m-%d/05-%M"))
         data = blob.download_as_text()
 
         namespaces = {
@@ -107,7 +113,7 @@ def main():
 
         speed = []
         for sp in speedTmp:
-            speed.append((None if sp[0] == None else sp[0].text, None if sp[1] == None else sp[1].text, None if sp[2] == None else sp[2].text))
+            speed.append((None if sp[0] == None or sp[0] == 0 else sp[0].text, None if sp[1] == None or sp[1] == 0 else sp[1].text, None if sp[2] == None or sp[2] == 0 else sp[2].text))
 
         flow = []
         for fl in flowTmp:
@@ -121,12 +127,13 @@ def main():
         dataframe = pd.concat([pd.DataFrame(data=data, columns=columns), dataframe])
     
     table = pa.Table.from_pandas(dataframe)
-    pq.write_to_dataset(table, root_path="test.parquet")
+    datasetPath = dt.strftime("%Y-%m")
+    fs_gcs = gcsfs.GCSFileSystem()
+    path = "gs://" + bucket_name + "/" + datasetPath + ".parquet"
+    pq.write_to_dataset(table, root_path=path, filesystem=fs_gcs)
 
-
-    #{heure : {CH:0542.05 : [120,0,23], CH:0026.02 : [23, 1, 123]}},{heure : {CH:0232.05 : [10,10,53], CH:0223.01 : [65, 12, 73]}}
-    #table = pa.Table.from_pandas(df)
-    #pq.write_table(table, 'example.parquet')
+if __name__ == "__main__":
+    to_parquet("")
 
 def create_bucket(name, client: storage.Client):    
     bucket = client.create_bucket(name, location="us-east1")
@@ -138,9 +145,6 @@ def create_blob(root_bucket: storage.Bucket, destination_name, data_type, data):
     generation_match_precondition = 0
     blob.upload_from_string(data, data_type, if_generation_match=generation_match_precondition)
     print("file created")
-
-if __name__ == "__main__":
-    main()
 
 class RawDataException(Exception):
     "Raised when ubucket of raw data doesn't exist"
