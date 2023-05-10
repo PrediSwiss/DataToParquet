@@ -39,7 +39,7 @@ def to_parquet(cloud_event):
     dataframe = pd.DataFrame()
 
     for dt in rrule.rrule(rrule.MINUTELY, dtstart=hourEarlier, until=now):
-        blob = bucketRaw.get_blob(dt.strftime("%Y-%m-%d/05-%M"))
+        blob = bucketRaw.get_blob(dt.strftime("%Y-%m-%d/%H-%M"))
         data = blob.download_as_text()
 
         namespaces = {
@@ -132,8 +132,8 @@ def to_parquet(cloud_event):
     path = "gs://" + bucket_name + "/" + datasetPath + ".parquet"
     pq.write_to_dataset(table, root_path=path, filesystem=fs_gcs)
 
-if __name__ == "__main__":
-    to_parquet("")
+#if __name__ == "__main__":
+#    to_parquet("")
 
 def create_bucket(name, client: storage.Client):    
     bucket = client.create_bucket(name, location="us-east1")
