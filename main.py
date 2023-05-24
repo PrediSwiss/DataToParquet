@@ -14,19 +14,7 @@ bucket_row = "prediswiss-raw-data"
 
 @functions_framework.cloud_event
 def to_parquet(cloud_event):
-    #datasetPath = "2023-05"
-    #fs_gcs = gcsfs.GCSFileSystem()
-    #path = bucket_name + "/" + datasetPath + ".parquet"
-    #table = pq.read_table(path, filesystem=fs_gcs)
-    #df = table.to_pandas()
-    #print(df.groupby(["publication_date"]).count())
-
     storage_client = storage.Client(project="prediswiss")
-
-    try:
-        bucketParquet = storage_client.get_bucket(bucket_name)
-    except:
-        bucketParquet = create_bucket(bucket_name, storage_client)
 
     try:
         bucketRaw = storage_client.get_bucket(bucket_row)
@@ -40,92 +28,94 @@ def to_parquet(cloud_event):
 
     for dt in rrule.rrule(rrule.MINUTELY, dtstart=hourEarlier, until=now):
         blob = bucketRaw.get_blob(dt.strftime("%Y-%m-%d/%H-%M"))
-        data = blob.download_as_text()
 
-        namespaces = {
-            'ns0': 'http://schemas.xmlsoap.org/soap/envelope/',
-            'ns1': 'http://datex2.eu/schema/2/2_0',
-        }
+        if blob.exists(storage_client) == True:
+            data = blob.download_as_text()
 
-        dom = ET.fromstring(data)
+            namespaces = {
+                'ns0': 'http://schemas.xmlsoap.org/soap/envelope/',
+                'ns1': 'http://datex2.eu/schema/2/2_0',
+            }
 
-        publicationDate = dom.find(
-            './ns0:Body'
-            '/ns1:d2LogicalModel'
-            '/ns1:payloadPublication'
-            '/ns1:publicationTime',
-            namespaces
-        ).text
+            dom = ET.fromstring(data)
 
-        compteurs = dom.findall(
-            './ns0:Body'
-            '/ns1:d2LogicalModel'
-            '/ns1:payloadPublication'
-            '/ns1:siteMeasurements',
-            namespaces
-        )
+            publicationDate = dom.find(
+                './ns0:Body'
+                '/ns1:d2LogicalModel'
+                '/ns1:payloadPublication'
+                '/ns1:publicationTime',
+                namespaces
+            ).text
 
-        flowTmp = [(compteur.find(
-            './ns1:measuredValue[@index="1"]'
-            '/ns1:measuredValue'
-            '/ns1:basicData'
-            '/ns1:vehicleFlow'
-            '/ns1:vehicleFlowRate',
-            namespaces
-        ), compteur.find(
-            './ns1:measuredValue[@index="11"]'
-            '/ns1:measuredValue'
-            '/ns1:basicData'
-            '/ns1:vehicleFlow'
-            '/ns1:vehicleFlowRate',
-            namespaces
-        ), compteur.find(
-            './ns1:measuredValue[@index="21"]'
-            '/ns1:measuredValue'
-            '/ns1:basicData'
-            '/ns1:vehicleFlow'
-            '/ns1:vehicleFlowRate',
-            namespaces
-        )) for compteur in compteurs]
+            compteurs = dom.findall(
+                './ns0:Body'
+                '/ns1:d2LogicalModel'
+                '/ns1:payloadPublication'
+                '/ns1:siteMeasurements',
+                namespaces
+            )
 
-        speedTmp = [(compteur.find(
-            './ns1:measuredValue[@index="2"]'
-            '/ns1:measuredValue'
-            '/ns1:basicData'
-            '/ns1:averageVehicleSpeed'
-            '/ns1:speed',
-            namespaces
-        ), compteur.find(
-            './ns1:measuredValue[@index="12"]'
-            '/ns1:measuredValue'
-            '/ns1:basicData'
-            '/ns1:averageVehicleSpeed'
-            '/ns1:speed',
-            namespaces
-        ), compteur.find(
-            './ns1:measuredValue[@index="22"]'
-            '/ns1:measuredValue'
-            '/ns1:basicData'
-            '/ns1:averageVehicleSpeed'
-            '/ns1:speed',
-            namespaces
-        )) for compteur in compteurs]
+            flowTmp = [(compteur.find(
+                './ns1:measuredValue[@index="1"]'
+                '/ns1:measuredValue'
+                '/ns1:basicData'
+                '/ns1:vehicleFlow'
+                '/ns1:vehicleFlowRate',
+                namespaces
+            ), compteur.find(
+                './ns1:measuredValue[@index="11"]'
+                '/ns1:measuredValue'
+                '/ns1:basicData'
+                '/ns1:vehicleFlow'
+                '/ns1:vehicleFlowRate',
+                namespaces
+            ), compteur.find(
+                './ns1:measuredValue[@index="21"]'
+                '/ns1:measuredValue'
+                '/ns1:basicData'
+                '/ns1:vehicleFlow'
+                '/ns1:vehicleFlowRate',
+                namespaces
+            )) for compteur in compteurs]
 
-        speed = []
-        for sp in speedTmp:
-            speed.append((None if sp[0] == None or sp[0] == 0 else sp[0].text, None if sp[1] == None or sp[1] == 0 else sp[1].text, None if sp[2] == None or sp[2] == 0 else sp[2].text))
+            speedTmp = [(compteur.find(
+                './ns1:measuredValue[@index="2"]'
+                '/ns1:measuredValue'
+                '/ns1:basicData'
+                '/ns1:averageVehicleSpeed'
+                '/ns1:speed',
+                namespaces
+            ), compteur.find(
+                './ns1:measuredValue[@index="12"]'
+                '/ns1:measuredValue'
+                '/ns1:basicData'
+                '/ns1:averageVehicleSpeed'
+                '/ns1:speed',
+                namespaces
+            ), compteur.find(
+                './ns1:measuredValue[@index="22"]'
+                '/ns1:measuredValue'
+                '/ns1:basicData'
+                '/ns1:averageVehicleSpeed'
+                '/ns1:speed',
+                namespaces
+            )) for compteur in compteurs]
 
-        flow = []
-        for fl in flowTmp:
-            flow.append((None if fl[0] == None else fl[0].text, None if fl[1] == None else fl[1].text, None if fl[2] == None else fl[2].text))
+            speed = []
+            for sp in speedTmp:
+                speed.append((None if sp[0] == None or sp[0] == 0 else sp[0].text, None if sp[1] == None or sp[1] == 0 else sp[1].text, None if sp[2] == None or sp[2] == 0 else sp[2].text))
 
-        compteursId = [comp.find('ns1:measurementSiteReference', namespaces).get("id") for comp in compteurs]
+            flow = []
+            for fl in flowTmp:
+                flow.append((None if fl[0] == None else fl[0].text, None if fl[1] == None else fl[1].text, None if fl[2] == None else fl[2].text))
 
-        columns = ["publication_date", "id", "flow_1", "flow_11", "flow_21", "speed_2", "speed_12", "speed_22"]
+            compteursId = [comp.find('ns1:measurementSiteReference', namespaces).get("id") for comp in compteurs]
 
-        data = [(publicationDate, compteursId[i], flow[i][0], flow[i][1], flow[i][2], speed[i][0], speed[i][1], speed[i][2]) for i in range(len(compteursId)) ]
-        dataframe = pd.concat([pd.DataFrame(data=data, columns=columns), dataframe])
-    
+            columns = ["publication_date", "id", "flow_1", "flow_11", "flow_21", "speed_2", "speed_12", "speed_22"]
+
+            data = [(publicationDate, compteursId[i], flow[i][0], flow[i][1], flow[i][2], speed[i][0], speed[i][1], speed[i][2]) for i in range(len(compteursId)) ]
+            dataframe = pd.concat([pd.DataFrame(data=data, columns=columns), dataframe])
+        
     table = pa.Table.from_pandas(dataframe)
     datasetPath = dt.strftime("%Y-%m")
     fs_gcs = gcsfs.GCSFileSystem()
